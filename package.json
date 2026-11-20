@@ -1,0 +1,13 @@
+{
+  "name": "wie-ben-ik-oropendola",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Mobile party flyer game with progressive hints and a nightmare mode. Deploys to Vercel.",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "start": "node dev-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
