@@ -73,6 +73,7 @@
   const $ = (s) => document.querySelector(s);
   let pw = sessionStorage.getItem('admin_pw') || '', users = [], timer, setup = false;
   const open = new Set();
+  const MODE_LABEL = { normal: 'normaal', hard: '🔥 hard', nightmare: '😈 nightmare' };
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ts = (t) => (t ? new Date(t).getTime() : 0);
   const ago = (t) => { t = ts(t); if (!t) return '–'; const s = (Date.now() - t) / 1000; return s < 60 ? 'net nu' : s < 3600 ? Math.round(s / 60) + ' min geleden' : s < 86400 ? Math.round(s / 3600) + ' u geleden' : new Date(t).toLocaleDateString('nl-BE'); };
@@ -91,7 +92,7 @@
   function runsTable(u) {
     if (!u.runs.length) return '<div class="none">Nog geen pogingen.</div>';
     return '<table><tr><th>Modus</th><th>Score</th><th>Doodsoorzaak</th><th>Tijd</th><th>Pluimen</th><th>Bomen</th><th>Wanneer</th></tr>' +
-      u.runs.map((r) => `<tr><td>${r.nightmare ? '😈 nightmare' : 'normaal'}</td><td><b>${r.score}</b></td><td>${esc(causeLabel(r.cause))}</td><td>${r.seconds} s</td><td>${r.feathers}</td><td>${r.passed}</td><td>${when(r.at)}</td></tr>`).join('') +
+      u.runs.map((r) => `<tr><td>${MODE_LABEL[r.mode] || r.mode}</td><td><b>${r.score}</b></td><td>${esc(causeLabel(r.cause))}</td><td>${r.seconds} s</td><td>${r.feathers}</td><td>${r.passed}</td><td>${when(r.at)}</td></tr>`).join('') +
       '</table>';
   }
   function render() {
@@ -102,8 +103,9 @@
     const list = users.filter((u) => !q || (u.name || '').toLowerCase().includes(q));
     $('#list').innerHTML = list.map((u) => {
       const best = Math.max(0, ...u.runs.map((r) => r.score));
-      const nmRuns = u.runs.filter((r) => r.nightmare);
-      const bestNm = Math.max(0, ...nmRuns.map((r) => r.score));
+      const byMode = (m) => u.runs.filter((r) => r.mode === m);
+      const nmRuns = byMode('nightmare'), hardRuns = byMode('hard');
+      const bestNm = Math.max(0, ...nmRuns.map((r) => r.score)), bestHard = Math.max(0, ...hardRuns.map((r) => r.score));
       return `
       <div class="u ${u.nightmare ? 'nm' : ''} ${open.has(u.id) ? 'open' : ''}">
         <div class="name">${u.nightmare ? '😈 ' : ''}${esc(u.name)}</div>
@@ -113,7 +115,7 @@
         </div>
         <div class="meta">
           <button class="toggle-runs" data-runs="${esc(u.id)}">${u.runs.length} pogingen ${open.has(u.id) ? '▴' : '▾'}</button>
-          <span>${nmRuns.length} in nightmare</span><span>record ${best}</span><span>nightmare-record ${bestNm}</span>
+          <span>${hardRuns.length} hard · ${nmRuns.length} nightmare</span><span>record ${best}</span><span>hard-record ${bestHard}</span><span>nightmare-record ${bestNm}</span>
           <span>laatst ${ago(u.lastSeen)}</span><span>sinds ${ago(u.createdAt)}</span>
           <button class="del" data-del="${esc(u.id)}" data-name="${esc(u.name)}">schrappen</button>
         </div>

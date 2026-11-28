@@ -46,9 +46,6 @@
       <canvas id="cv"></canvas>
       <div class="hud">
         <div id="hintCard" class="hint-card hidden"><div class="hint-art"></div></div>
-        <div class="hud-mid">
-          <button id="nmToggle" class="nm-toggle" aria-label="Nightmare-modus"><span class="sw"><i></i></span><span class="skull">😈</span></button>
-        </div>
         <div class="hud-right">
           <div class="pill score-pill"><span id="score">0</span></div>
           <button id="muteBtn" class="pill small icon-btn" aria-label="Geluid">🔊</button>
@@ -60,6 +57,11 @@
       <div id="ready" class="ready">
         <div class="ready-card">
           <div class="ready-mode" id="readyMode"></div>
+          <div id="modePick" class="mode-pick" role="radiogroup" aria-label="Moeilijkheid">
+            <button data-pick="normal">Normaal</button>
+            <button data-pick="hard">🔥 Hard</button>
+            <button data-pick="nightmare">😈 Nightmare</button>
+          </div>
           <div class="tap">Tik om te vliegen</div>
           <div class="best">Record: <b id="bestScore">0</b></div>
         </div>
@@ -82,9 +84,10 @@
             <button id="boardClose" class="board-x" aria-label="Sluiten">✕</button>
           </div>
           <div class="tabs" role="tablist">
-            <button class="tab on" data-mode="all">Alle spellen</button>
+            <button class="tab on" data-mode="all">Alles</button>
+            <button class="tab" data-mode="hard">🔥 Hard</button>
             <button class="tab" data-mode="nm">😈 Nightmare</button>
-            <button class="tab" data-mode="causes">💀 Doodsoorzaken</button>
+            <button class="tab" data-mode="causes">💀 Oorzaken</button>
           </div>
           <div id="boardSub" class="tabs sub" role="tablist">
             <button class="tab on" data-view="best">Beste per speler</button>

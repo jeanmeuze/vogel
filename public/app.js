@@ -1,4 +1,4 @@
-/* Screens, identity, nightmare logic and the score boards. */
+/* Screens, identity, game modes (normal / hard / nightmare) and the score boards. */
 (() => {
   'use strict';
   const $ = (s) => document.querySelector(s);
@@ -8,7 +8,8 @@
     del(k) { try { localStorage.removeItem(k); } catch {} },
   };
   const ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
-  const RANDOM_NIGHTMARE = 0.25; // players without the stamp get ~1 nightmare game in 4
+  const RANDOM_NIGHTMARE = 0.25; // players without the stamp get ~1 surprise nightmare game in 4
+  const MODES = ['normal', 'hard', 'nightmare'];
 
   // ------------------------------------------------------------ identity
   // The device id lives in localStorage and (set by the server) in a long-lived cookie.
@@ -19,12 +20,13 @@
   const user = {
     name: store.get('oro_name') || '',
     forced: store.get('oro_forced') === '1', // "nightmare only" stamp (decided by the server)
-    pref: store.get('oro_pref') === '1',     // voluntary nightmare toggle
+    // mode the player picked on the start screen (old toggle 'oro_pref' = nightmare)
+    mode: MODES.includes(store.get('oro_mode')) ? store.get('oro_mode') : store.get('oro_pref') === '1' ? 'nightmare' : 'normal',
     best: Number(store.get('oro_best') || 0),
   };
   const saveUser = () => {
     store.set('oro_id', id); store.set('oro_name', user.name); store.set('oro_forced', user.forced ? '1' : '0');
-    store.set('oro_pref', user.pref ? '1' : '0'); store.set('oro_best', String(user.best));
+    store.set('oro_mode', user.mode); store.set('oro_best', String(user.best));
   };
   function applyServerUser(u) {
     id = u.id; user.name = u.name; user.forced = !!u.nightmare;
@@ -32,9 +34,10 @@
     saveUser();
   }
 
-  let runMode = 'normal';
+  let runMode = 'normal', surprise = false;
   function rollRunMode() {
-    runMode = user.forced || user.pref || Math.random() < RANDOM_NIGHTMARE ? 'nightmare' : 'normal';
+    surprise = !user.forced && user.mode !== 'nightmare' && Math.random() < RANDOM_NIGHTMARE;
+    runMode = user.forced || surprise ? 'nightmare' : user.mode;
   }
 
   async function api(url, body) {
@@ -69,7 +72,7 @@
       else renderToggle();
     } catch (e) {
       if (e.status === 404) { // removed by the admin: start over with a new name
-        user.name = ''; user.forced = false; user.pref = false; user.best = 0; saveUser();
+        user.name = ''; user.forced = false; user.mode = 'normal'; user.best = 0; saveUser();
         store.del('oro_name');
         if (current !== 'game' || OG.game.state !== 'playing') show('welcome');
       }
@@ -99,12 +102,13 @@
   const ready = $('#ready'), over = $('#over'), board = $('#board');
 
   function renderToggle() {
-    const t = $('#nmToggle');
     const playing = OG.game.state === 'playing';
-    t.classList.toggle('on', user.pref);
-    t.style.visibility = user.forced || playing ? 'hidden' : 'visible';
     $('#boardBtn').style.visibility = playing ? 'hidden' : 'visible';
-    $('#readyMode').innerHTML = runMode === 'nightmare' ? '<span class="nm-badge">😈 NIGHTMARE</span>' : '';
+    // players with the nightmare-only stamp get no choice (and no explanation)
+    $('#modePick').classList.toggle('hidden', user.forced);
+    document.querySelectorAll('#modePick [data-pick]').forEach((b) => b.classList.toggle('on', b.dataset.pick === runMode));
+    $('#readyMode').innerHTML = runMode === 'nightmare' ? '<span class="nm-badge">😈 NIGHTMARE' + (surprise ? ' 🎲' : '') + '</span>'
+      : runMode === 'hard' ? '<span class="nm-badge hard">🔥 HARD</span>' : '';
     $('#bestScore').textContent = user.best;
     document.body.classList.toggle('nm', current === 'game' && runMode === 'nightmare');
   }
@@ -116,12 +120,17 @@
     renderToggle();
   }
 
-  $('#nmToggle').addEventListener('click', (e) => {
+  // mode buttons on the start screen; a plain tap starts in the mode shown
+  const modePick = $('#modePick');
+  modePick.addEventListener('pointerdown', (e) => e.stopPropagation());
+  modePick.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (OG.game.state === 'playing' || user.forced) return;
-    user.pref = !user.pref; saveUser();
-    toast(user.pref ? '😈 Nightmare aan. Ge hebt het zelf gezocht.' : 'Nightmare uit.');
-    newRun();
+    const b = e.target.closest('[data-pick]');
+    if (!b || OG.game.state !== 'ready' || user.forced) return;
+    user.mode = b.dataset.pick; saveUser();
+    surprise = false; runMode = user.mode;
+    OG.game.reset(runMode);
+    renderToggle();
   });
   $('#muteBtn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -149,6 +158,7 @@
 
   // ------------------------------------------------------------ score boards
   const boardState = { mode: 'all', view: 'best', data: null };
+  const MODE_ICON = { hard: ' 🔥', nightmare: ' 😈' };
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -166,19 +176,20 @@
         || '<li class="empty">Nog niemand gestorven. Nog niet.</li>';
       return;
     }
-    const key = (boardState.mode === 'nm' ? 'nm' : '') + (boardState.view === 'best' ? 'Best' : 'Top');
+    const prefix = { all: '', hard: 'hard', nm: 'nm' }[boardState.mode];
+    const key = prefix + (boardState.view === 'best' ? 'Best' : 'Top');
     const rows = d[key.charAt(0).toLowerCase() + key.slice(1)] || [];
     list.innerHTML = rows.map((r, i) => `
       <li class="${r.you ? 'you' : ''}">
         <span class="rk">${MEDALS[i] || i + 1}</span>
-        <span class="nm">${esc(r.name)}${boardState.mode === 'all' && r.nightmare ? ' 😈' : ''}</span>
+        <span class="nm">${esc(r.name)}${boardState.mode === 'all' ? MODE_ICON[r.mode] || '' : ''}</span>
         <span class="sc">${r.score}</span>
       </li>`).join('') || '<li class="empty">Nog geen scores. Wees de eerste!</li>';
   }
   async function openBoard(e) {
     if (e) e.stopPropagation();
     if (OG.game.state === 'playing') return;
-    if (runMode === 'nightmare' && !boardState.data) boardState.mode = 'nm';
+    if (!boardState.opened) { boardState.opened = true; boardState.mode = { nightmare: 'nm', hard: 'hard' }[runMode] || 'all'; }
     boardState.data = null;
     board.classList.remove('hidden');
     renderBoard();
@@ -219,11 +230,11 @@
       if (record) { user.best = r.score; saveUser(); }
       $('#overCause').textContent = r.cause;
       $('#overScore').textContent = r.score;
-      $('#overMeta').textContent = `${r.feathers} pluimen · ${r.passed} bomen · ${r.seconds} s` + (r.mode === 'nightmare' ? ' · ×2 nightmare' : '');
+      $('#overMeta').textContent = `${r.feathers} pluimen · ${r.passed} bomen · ${r.seconds} s` + (r.mode !== 'normal' ? ` · ×${GAME_CONFIG[r.mode].scoreMultiplier} ${r.mode}` : '');
       $('#overBest').innerHTML = record ? '🏆 <b>Nieuw record!</b>' : `Record: <b>${Math.max(prev, r.score)}</b>`;
       over.classList.remove('hidden');
       renderToggle();
-      api('/api/score', { id, score: r.score, nightmare: r.mode === 'nightmare', seconds: r.seconds, feathers: r.feathers, passed: r.passed, cause: r.causeKey })
+      api('/api/score', { id, score: r.score, mode: r.mode, nightmare: r.mode === 'nightmare', seconds: r.seconds, feathers: r.feathers, passed: r.passed, cause: r.causeKey })
         .then((j) => { if (j.user) applyServerUser(j.user); })
         .catch(() => {});
     },

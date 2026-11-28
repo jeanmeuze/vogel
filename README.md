@@ -7,14 +7,15 @@ A mobile-first one-thumb flyer game for a costume party. Guests scan a QR code o
 ## How it plays
 
 - Tap to flap. Fly between trees and hanging vines (some carry a woven oropendola nest), and catch feathers.
-- Score = feathers + trees passed, doubled in nightmare mode. Every attempt is stored in the database.
-- 🏆 **Score boards** (button top-right and after each run), visible to everyone: *All games* and *😈 Nightmare*, each with **best per player** and **top 10 ever**.
+- Three modes: **normal**, **🔥 hard** and **😈 nightmare**. Players pick one with the buttons on the start screen; a plain tap starts in the mode shown.
+- Score = feathers + trees passed, ×1.5 in hard and ×2 in nightmare. Every attempt is stored in the database, with its mode and cause of death.
+- 🏆 **Score boards** (button top-right and after each run), visible to everyone: *All games* and *😈 Nightmare*, each with **best per player** and **top 10 ever**, plus *🔥 Hard* and *💀 Causes* (top 10 causes of death).
 - **Progressive hints** within a run. The times are in `public/config.js` → `hints`:
   | after | hint |
   | --- | --- |
   | 8 s | a hint card appears top-left showing just the **yellow tail** |
   | 16 s | + the **pale bill and yellowish forehead** |
-  | 22 s | **predators from the bird's own region** start hunting you: harpy eagle (dives at you), emerald tree boa (strikes down; in normal mode no further than halfway down the screen), capuchin monkey (swings on a vine), toucan (rams you), jaguar (leaps from the ground) |
+  | 22 s | **predators from the bird's own region** start hunting you: harpy eagle (dives at you), emerald tree boa (strikes down), capuchin monkey (swings on a vine), toucan (rams you), jaguar (leaps from the ground). Snakes and jaguars always sit in the middle half (25–75%) of the gap between two trees; in normal mode they reach no further than halfway up/down the screen. |
   | 28 s | + the **russet back** |
   | 36 s | **flags of the range countries** (Colombia, Ecuador, Peru, Bolivia, Venezuela, Brazil) appear on the trees |
   | 45 s | + the **olive head** |
@@ -24,7 +25,7 @@ A mobile-first one-thumb flyer game for a costume party. Guests scan a QR code o
 ## Nightmare mode 😈
 
 - **On a player's first visit** they enter a name. The server rolls the dice once: **1 in 4** new players get the **"nightmare only"** stamp. They are not told; their game is simply always nightmare and they get no toggle.
-- Everyone else gets a discreet 😈 toggle to switch nightmare on themselves. With the toggle off, each game still has a **1 in 4** chance of being a surprise nightmare game.
+- Everyone else picks normal / hard / nightmare before each game. When the picked mode is not nightmare, each game still has a **1 in 4** chance of being a surprise nightmare game (shown as 😈 NIGHTMARE 🎲; the player can still switch).
 - The player is remembered per device: an id in `localStorage` plus a long-lived cookie, so either one is enough to recognise the device.
 
 Nightmare mode is faster, has narrower gaps and predators from 5 s onward. It also gets a **random mix of chaos every run**, which gets more frequent and more intense the longer you survive:
@@ -44,6 +45,10 @@ Nightmare mode is faster, has narrower gaps and predators from 5 s onward. It al
 - silent traps: trees that suddenly topple towards you, vines that snap and fall, gaps that open and close, and "feathers" that turn out to be wasps
 
 Each nightmare run also gets **1–3 random permanent curses**: heavy wings, dancing trees, headwind, narrow gaps, fog, shy feathers, or rush.
+
+## Hard mode 🔥
+
+Hard has every crazy nightmare element (all events, silent traps and curses), but milder, shorter, with more warning and further apart: the first event comes after ~7 s and then every 12 → 6 s (nightmare: 6 → 2.2 s), at most 1 curse, and predators from 12 s. Tune it in `public/config.js` → `hard` (`chaos` holds the duration/power/warning/count multipliers).
 
 ## Admin
 

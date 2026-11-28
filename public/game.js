@@ -72,14 +72,16 @@
   }
 
   const groundY = () => H * 0.93;
-  const P = () => (g.mode === 'nightmare' ? CFG.nightmare : CFG.normal);
+  const P0 = (mode) => CFG[mode] || CFG.normal;
+  const P = () => P0(g.mode);
+  const chaotic = () => g.mode !== 'normal'; // hard and nightmare get the chaos events
+  const CH = () => P().chaos || CFG.nightmare.chaos;
   const curse = (k) => g.curses.includes(k);
 
   function reset(mode) {
-    const nm = mode === 'nightmare';
     let curses = [];
-    if (nm) {
-      const [a, b] = CFG.nightmare.curses;
+    if (P0(mode).curses) {
+      const [a, b] = P0(mode).curses;
       const n = Math.floor(rand(a, b + 1));
       curses = Object.keys(CURSES).sort(() => Math.random() - 0.5).slice(0, n);
     }
@@ -91,20 +93,19 @@
       e: { storm: 0, flip: 0, dark: 0, quake: 0, turbo: 0, drunk: 0, mirror: 0, big: 0 },
       wind: 0, stormPow: 0, ufo: null, cocoRain: 0, cocoRate: 0, cocoAcc: 0, waspT: 0,
       pending: { topple: 0, snap: 0, crusher: 0 }, flapQueue: [],
-      curses, nextEvent: 3 + rand(0, 2), nextPred: P0(mode).predatorsFrom, lastEvent: '',
+      curses, nextEvent: (P0(mode).firstEvent || 3) + rand(0, 2), nextPred: P0(mode).predatorsFrom, lastEvent: '',
       hintStage: 0, nextSong: 0, flagsOn: false, cause: null, carry: null, deadT: 0,
     };
     if (hooks.onHint) hooks.onHint(0);
     if (hooks.onScore) hooks.onScore(0);
   }
-  const P0 = (mode) => (mode === 'nightmare' ? CFG.nightmare : CFG.normal);
 
   function start() {
     if (g.state !== 'ready') return;
     g.state = 'playing';
     g.sinceObs = spacing() * 0.35;
-    if (g.mode === 'nightmare') {
-      banner('😈 NIGHTMARE', 1.6, '#ff3b5c');
+    if (chaotic()) {
+      banner(g.mode === 'hard' ? '🔥 HARD' : '😈 NIGHTMARE', 1.6, g.mode === 'hard' ? '#ff9a3c' : '#ff3b5c');
       if (g.curses.length) setTimeout(() => g && g.state === 'playing' && banner(g.curses.map((c) => CURSES[c]).join('  ·  '), 2.6, '#ffd166', true), 900);
     }
   }
@@ -113,7 +114,7 @@
     if (!g) return;
     if (g.state === 'ready') start();
     if (g.state !== 'playing') return;
-    if (g.e.drunk > 0) { g.flapQueue.push(g.t + 0.2); return; }
+    if (g.e.drunk > 0) { g.flapQueue.push(g.t + 0.2 * CH().power); return; }
     doFlap();
   }
   function doFlap() {
@@ -127,7 +128,9 @@
   const speedBase = () => clamp(P().baseSpeed + P().speedRamp * g.t + (curse('fast') ? 0.06 : 0), 0, P().maxSpeed + (curse('fast') ? 0.06 : 0)) * H;
   const spacing = () => Math.max(P().spacing * H, W * 0.55);
   const obsW = () => Math.min(H * 0.11, W * 0.2);
-  const intensity = () => 1 + g.t / 45;
+  const intensity = () => 1 + (g.t / 45) * CH().intensity;
+  const dur = (s) => s * CH().duration; // event duration for the current mode
+  const cnt = (n) => Math.max(1, Math.round(n * CH().count)); // event count for the current mode
   const ramp = (pair, rs) => lerp(pair[0], pair[1], clamp(g.t / (rs || 90), 0, 1));
 
   function banner(text, dur = 1.6, color = '#fff', small = false) {
@@ -171,12 +174,12 @@
     g.fea.push({ x, y, color: pick(FEATHER_COLORS), ph: rand(0, TAU), wasp: g.waspT > 0, revealed: false, vx: 0, vy: 0 });
   }
 
-  // Snakes hang in the open space between two trees, somewhere in its middle half
+  // Snakes and jaguars sit in the open space between two trees, somewhere in its middle half
   // (25%..75%), never right against a tree. Trees and snakes scroll at the same speed,
   // so the position is fixed at spawn: between the newest tree and the next one
   // (which will appear one `spacing()` further), or one gap later if that spot is
   // already on screen.
-  function boaX() {
+  function gapX() {
     const last = g.obs[g.obs.length - 1];
     if (!last) return W + 30;
     const sp = spacing();
@@ -190,10 +193,10 @@
     type = type || pick(PRED_TYPES);
     const s = H;
     if (type === 'harpy') g.preds.push({ type, phase: 'warn', t: 0.9, x: W + 40, y: rand(0.08, 0.25) * s, vx: 0, vy: 0, r: s * 0.035 });
-    else if (type === 'boa') g.preds.push({ type, x: boaX(), len: rand(0.12, 0.26) * s, rest: 0, phase: 'idle', hold: 0, r: s * 0.028 });
+    else if (type === 'boa') g.preds.push({ type, x: gapX(), len: rand(0.12, 0.26) * s, rest: 0, phase: 'idle', hold: 0, r: s * 0.028 });
     else if (type === 'monkey') g.preds.push({ type, x: W + 40, L: rand(0.26, 0.42) * s, amp: rand(0.6, 0.95), w: rand(1.8, 2.6), ph: rand(0, TAU), r: s * 0.038, bx: 0, by: 0 });
     else if (type === 'toucan') g.preds.push({ type, x: W + 40, y0: clamp(g.bird.y + rand(-0.15, 0.15) * s, s * 0.15, groundY() - s * 0.1), y: 0, ph: rand(0, TAU), extra: rand(0.25, 0.4) * s, r: s * 0.03 });
-    else if (type === 'jaguar') g.preds.push({ type, x: W + 40, y: groundY() - s * 0.035, vy: 0, phase: 'lurk', r: s * 0.04 });
+    else if (type === 'jaguar') g.preds.push({ type, x: gapX(), y: groundY() - s * 0.035, vy: 0, phase: 'lurk', r: s * 0.04 });
     const last = g.preds[g.preds.length - 1];
     if (last) last.type === 'boa' && (last.rest = last.len);
   }
@@ -201,35 +204,35 @@
   // ---------------------------------------------------------------- nightmare events
   const EVENTS = {
     lightning: { w: 3, start(I) {
-      const n = Math.min(5, 1 + Math.floor(I));
+      const n = cnt(Math.min(5, 1 + Math.floor(I)));
       for (let i = 0; i < n; i++) {
         const x = clamp(g.bird.homeX + rand(-0.05, 0.25) * W, 20, W - 20);
         const tip = rand(0.35, 0.82) * H;
         const pts = [];
         for (let y = 0; y < tip; y += 18) pts.push([x + rand(-14, 14), y]);
         pts.push([x, tip]);
-        g.fx.push({ type: 'bolt', x, tip, pts, delay: i * 0.65, warn: 1.0, strike: 0.22 });
+        g.fx.push({ type: 'bolt', x, tip, pts, delay: i * 0.65 * CH().warn, warn: 1.0 * CH().warn, strike: 0.22 });
       }
       banner('⚡ ONWEER!', 1.2, '#ffe14d');
     } },
-    storm: { w: 3, cond: () => g.e.storm <= 0, start(I) { g.e.storm = rand(5, 8); g.stormPow = clamp(0.55 + 0.2 * I, 0.6, 1.25); banner('🌪️ STORM!', 1.4, '#cfe8ff'); } },
+    storm: { w: 3, cond: () => g.e.storm <= 0, start(I) { g.e.storm = dur(rand(5, 8)); g.stormPow = clamp(0.55 + 0.2 * I, 0.6, 1.25) * CH().power; banner('🌪️ STORM!', 1.4, '#cfe8ff'); } },
     ufo: { w: 2, cond: () => !g.ufo, start() {
-      g.ufo = { x: W + 80, y: H * 0.12, phase: 'enter', t: 0, dur: rand(6, 8), beam: false, beamT: 0, cow: false };
+      g.ufo = { x: W + 80, y: H * 0.12, phase: 'enter', t: 0, dur: dur(rand(6, 8)), beam: false, beamT: 0, cow: false };
       banner('🛸 ALIENS!', 1.4, '#8ff0ff'); OG.audio && OG.audio.sfx('ufo');
     } },
-    flip: { w: 2, cond: () => g.e.flip <= 0, start() { g.e.flip = 5; banner('🙃 ALLES OMGEKEERD!', 1.4, '#ffb3ff'); } },
-    dark: { w: 2, cond: () => g.e.dark <= 0, start() { g.e.dark = rand(5, 7); banner('🌑 LICHTEN UIT', 1.2, '#fff'); } },
-    quake: { w: 2, start() { g.e.quake = 5; banner('🌋 AARDBEVING!', 1.3, '#ffb37a'); } },
-    turbo: { w: 2, start() { g.e.turbo = 4; banner('🚀 TURBO!', 1.1, '#9dff9d'); } },
-    drunk: { w: 2, start() { g.e.drunk = 6; banner('🍹 DUIZELIG…', 1.3, '#ffd1f5'); } },
-    mirror: { w: 1, cond: () => g.e.mirror <= 0, start() { g.e.mirror = 5; banner('🪞 SPIEGELWERELD', 1.3, '#d6f3ff'); } },
-    coconuts: { w: 2, start(I) { g.cocoRain = 5; g.cocoRate = 1.4 + I; banner('🥥 KOKOSREGEN!', 1.2, '#f1d3a0'); } },
-    wasps: { w: 2, start() { g.waspT = 7; } }, // silent on purpose
-    balloon: { w: 1, start() { g.e.big = 5; banner('🎈 OPGEBLAZEN!', 1.2, '#ffc2c2'); } },
-    topple: { w: 3, start(I) { g.pending.topple += 2 + Math.floor(I / 2); } }, // silent
-    snap: { w: 2, start() { g.pending.snap += 2; } }, // silent
-    crusher: { w: 2, start() { g.pending.crusher += 2; } }, // silent
-    swarm: { w: 1, start() { for (let i = 0; i < 3; i++) setTimeout(() => g && g.state === 'playing' && spawnPredator(), i * 450); banner('🐾 ZE KOMEN!', 1.2, '#ffcf8a'); } },
+    flip: { w: 2, cond: () => g.e.flip <= 0, start() { g.e.flip = dur(5); banner('🙃 ALLES OMGEKEERD!', 1.4, '#ffb3ff'); } },
+    dark: { w: 2, cond: () => g.e.dark <= 0, start() { g.e.dark = dur(rand(5, 7)); banner('🌑 LICHTEN UIT', 1.2, '#fff'); } },
+    quake: { w: 2, start() { g.e.quake = dur(5); banner('🌋 AARDBEVING!', 1.3, '#ffb37a'); } },
+    turbo: { w: 2, start() { g.e.turbo = dur(4); banner('🚀 TURBO!', 1.1, '#9dff9d'); } },
+    drunk: { w: 2, start() { g.e.drunk = dur(6); banner('🍹 DUIZELIG…', 1.3, '#ffd1f5'); } },
+    mirror: { w: 1, cond: () => g.e.mirror <= 0, start() { g.e.mirror = dur(5); banner('🪞 SPIEGELWERELD', 1.3, '#d6f3ff'); } },
+    coconuts: { w: 2, start(I) { g.cocoRain = dur(5); g.cocoRate = (1.4 + I) * CH().power; banner('🥥 KOKOSREGEN!', 1.2, '#f1d3a0'); } },
+    wasps: { w: 2, start() { g.waspT = dur(7); } }, // silent on purpose
+    balloon: { w: 1, start() { g.e.big = dur(5); banner('🎈 OPGEBLAZEN!', 1.2, '#ffc2c2'); } },
+    topple: { w: 3, start(I) { g.pending.topple += cnt(2 + Math.floor(I / 2)); } }, // silent
+    snap: { w: 2, start() { g.pending.snap += cnt(2); } }, // silent
+    crusher: { w: 2, start() { g.pending.crusher += cnt(2); } }, // silent
+    swarm: { w: 1, start() { for (let i = 0, n = Math.max(2, cnt(3)); i < n; i++) setTimeout(() => g && g.state === 'playing' && spawnPredator(), i * 450 * CH().warn); banner('🐾 ZE KOMEN!', 1.2, '#ffcf8a'); } },
   };
   function triggerEvent() {
     const pool = [];
@@ -292,7 +295,7 @@
       // wind (storm or curse) -> scroll slows, stops or reverses; bird gets pushed back
       const windTarget = e.storm > 0 ? g.stormPow : curse('wind') ? 0.25 : 0;
       g.wind += (windTarget - g.wind) * Math.min(1, dt * 1.5);
-      const scrollMul = (1 - 1.25 * g.wind) * (e.turbo > 0 ? 1.7 : 1);
+      const scrollMul = (1 - 1.25 * g.wind) * (e.turbo > 0 ? 1 + 0.7 * CH().power : 1);
       const v = speedBase() * scrollMul;
       g.dist += v * dt;
 
@@ -307,20 +310,20 @@
       b.x -= g.wind * 0.22 * H * dt;
       if (g.wind < 0.3) b.x += (b.homeX - b.x) * 0.9 * dt;
       b.x = clamp(b.x, b.r + 2, W * 0.6);
-      b.scale += ((e.big > 0 ? 1.9 : 1) - b.scale) * Math.min(1, dt * 4);
+      b.scale += ((e.big > 0 ? 1 + 0.9 * CH().power : 1) - b.scale) * Math.min(1, dt * 4);
       const R = b.r * b.scale, hr = R * 0.78;
       if (flip) { if (b.y - hr < 0) return die('ceiling'); if (b.y > gy - R) { b.y = gy - R; b.vy = 0; } }
       else { if (b.y < R) { b.y = R; b.vy = 0; } if (b.y + hr > gy) return die('ground'); }
 
       // spawn
       // The next tree comes exactly spacing() after the newest one (also after being blown
-      // backwards), so snakes placed in the gap ahead (boaX) stay where they belong.
+      // backwards), so snakes and jaguars placed in the gap ahead (gapX) stay where they belong.
       const lastObs = g.obs[g.obs.length - 1];
       if (lastObs) { if (lastObs.x + spacing() <= W + 10) spawnObstacle(lastObs.x + spacing()); }
       else if (v > 0) { g.sinceObs += v * dt; if (g.sinceObs >= spacing()) { g.sinceObs = 0; spawnObstacle(); } }
       const pf = P().predatorsFrom;
       if (g.t >= pf && g.t >= g.nextPred) { spawnPredator(); g.nextPred = g.t + ramp(P().predatorEvery, 90) * rand(0.75, 1.25); }
-      if (g.mode === 'nightmare' && g.t >= g.nextEvent) { triggerEvent(); g.nextEvent = g.t + ramp(CFG.nightmare.eventEvery, CFG.nightmare.rampSeconds) * rand(0.7, 1.25); }
+      if (chaotic() && g.t >= g.nextEvent) { triggerEvent(); g.nextEvent = g.t + ramp(P().eventEvery, P().rampSeconds) * rand(0.7, 1.25); }
       if (g.cocoRain > 0) {
         g.cocoRain -= dt; g.cocoAcc += g.cocoRate * dt;
         while (g.cocoAcc >= 1) { g.cocoAcc--; g.fx.push({ type: 'coco', x: rand(b.x - 0.05 * W, W * 1.05), y: -20, vy: rand(0, 0.2) * H, r: H * 0.022, rot: 0 }); }
@@ -330,12 +333,12 @@
       for (const o of g.obs) {
         o.x -= v * dt;
         let dy = o.move ? Math.sin(g.t * 1.6 + o.phase) * o.move : 0;
-        if (e.quake > 0) dy += Math.sin(clock * 9 + o.phase) * H * 0.045;
+        if (e.quake > 0) dy += Math.sin(clock * 9 + o.phase) * H * 0.045 * CH().power;
         const gapNow = o.breath ? o.gap * (0.5 + 0.5 * (0.5 + 0.5 * Math.cos(g.t * 2.4 + o.phase))) : o.gap;
         o.top = o.cy + dy - gapNow / 2;
         o.bot = o.cy + dy + gapNow / 2;
         const ahead = o.x - b.x;
-        if (o.topple === 'armed' && ahead < H * 0.42) { o.topple = 'warn'; o.warnT = 0.35; o.L = gy - o.bot; OG.audio && OG.audio.sfx('warn'); }
+        if (o.topple === 'armed' && ahead < H * 0.42) { o.topple = 'warn'; o.warnT = 0.35 * CH().warn; o.L = gy - o.bot; OG.audio && OG.audio.sfx('warn'); }
         if (o.topple === 'warn') { o.warnT -= dt; if (o.warnT <= 0) o.topple = 'fall'; }
         if (o.topple === 'fall') { o.av += 7 * dt; o.angle -= o.av * dt; if (o.angle <= -1.45) { o.angle = -1.45; o.topple = 'down'; g.shake = Math.max(g.shake, 8); } }
         if (o.snap === 'armed' && ahead < H * 0.5) { o.snap = 'fall'; OG.audio && OG.audio.sfx('warn'); }
@@ -393,7 +396,7 @@
 
       if (g.ufo && updateUfo(dt, b, hr)) return;
 
-      g.score = Math.round((g.feathers + g.passed) * (g.mode === 'nightmare' ? CFG.nightmare.scoreMultiplier : 1));
+      g.score = Math.round((g.feathers + g.passed) * (P().scoreMultiplier || 1));
       hooks.onScore && hooks.onScore(g.score);
     } else if (g.state === 'dead') {
       g.deadT += dt;
@@ -429,7 +432,7 @@
         if (p.t <= 0) {
           p.phase = 'dive';
           const tx = b.x + rand(-0.02, 0.06) * W, ty = b.y + b.vy * 0.25;
-          const d = Math.hypot(tx - p.x, ty - p.y) || 1, sp = H * (g.mode === 'nightmare' ? 1.3 : 1.05);
+          const d = Math.hypot(tx - p.x, ty - p.y) || 1, sp = H * (g.mode === 'nightmare' ? 1.3 : g.mode === 'hard' ? 1.15 : 1.05);
           p.vx = ((tx - p.x) / d) * sp; p.vy = ((ty - p.y) / d) * sp;
         }
       } else { p.x += p.vx * dt; p.y += p.vy * dt; if (p.x < -80 || p.y > H + 80 || p.y < -100) p.gone = true; }
@@ -437,7 +440,7 @@
     } else if (p.type === 'boa') {
       p.x -= v * dt;
       const near = p.x - b.x < H * 0.14 && p.x - b.x > -H * 0.08;
-      if (p.phase === 'idle' && near) { p.phase = 'strike'; p.target = clamp(b.y + H * 0.05, p.rest, g.mode === 'nightmare' ? gy - 10 : H * 0.5); } // normal: snakes reach halfway at most
+      if (p.phase === 'idle' && near) { p.phase = 'strike'; p.target = clamp(b.y + H * 0.05, p.rest, g.mode === 'normal' ? H * 0.5 : gy - 10); } // normal: snakes reach halfway at most
       if (p.phase === 'strike') { p.len += H * 2.3 * dt; if (p.len >= p.target) { p.len = p.target; p.phase = 'hold'; p.hold = 0.3; } }
       else if (p.phase === 'hold') { p.hold -= dt; if (p.hold <= 0) p.phase = 'back'; }
       else if (p.phase === 'back') { p.len = Math.max(p.rest, p.len - H * 0.8 * dt); }
@@ -457,7 +460,11 @@
       if (p.x < -80) p.gone = true;
     } else if (p.type === 'jaguar') {
       p.x -= v * dt;
-      if (p.phase === 'lurk' && p.x - b.x < H * 0.3) { p.phase = 'leap'; const h = Math.max(H * 0.15, gy - b.y + H * 0.04); p.vy = -Math.sqrt(2 * 2.6 * H * h); }
+      if (p.phase === 'lurk' && p.x - b.x < H * 0.3) {
+        p.phase = 'leap';
+        let h = Math.max(H * 0.15, gy - b.y + H * 0.04);
+        if (g.mode === 'normal') h = Math.min(h, gy - H * 0.035 - H * 0.5); // normal: jaguars reach halfway at most
+        p.vy = -Math.sqrt(2 * 2.6 * H * h); }
       if (p.phase === 'leap') { p.vy += 2.6 * H * dt; p.y += p.vy * dt; if (p.y >= gy - H * 0.035) { p.y = gy - H * 0.035; p.phase = 'done'; } }
       if (Math.hypot(p.x - b.x, p.y - b.y) < hr + p.r) { die('jaguar'); return true; }
       if (p.x < -80) p.gone = true;
@@ -479,7 +486,7 @@
     if (u.beam && u.phase === 'hover') {
       const halfW = lerp(H * 0.035, H * 0.13, clamp((b.y - u.y) / (groundY() - u.y), 0, 1));
       if (Math.abs(b.x - u.x) < halfW && b.y > u.y) {
-        b.vy -= 3.4 * H * dt;
+        b.vy -= 3.4 * H * dt * (0.5 + 0.5 * CH().power);
         b.x += (u.x - b.x) * dt * 1.5;
         if (b.y < u.y + H * 0.05) { die('ufo', u); return true; }
       }
@@ -910,5 +917,6 @@
     get state() { return g ? g.state : 'none'; },
     get mode() { return g ? g.mode : 'normal'; },
   };
-  if (DEV) OG.game.debug = { get g() { return g; }, event: (k) => EVENTS[k].start(intensity()), predator: spawnPredator, skip: (s) => { g.t += s; } };
+  if (DEV) OG.game.debug = { get g() { return g; }, event: (k) => EVENTS[k].start(intensity()), predator: spawnPredator, skip: (s) => { g.t += s; },
+    run: (s, dt = 1 / 60) => { for (let i = 0; i < s / dt && g.state === 'playing'; i++) update(dt); } }; // advance the game without rendering
 })();

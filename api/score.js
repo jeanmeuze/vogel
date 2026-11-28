@@ -1,4 +1,5 @@
-// POST /api/score {id, score, nightmare, seconds, feathers, passed} -> stores the run.
+// POST /api/score {id, score, mode, cause, seconds, feathers, passed} -> stores the run.
+// mode: 'normal' | 'hard' | 'nightmare' (older clients only send nightmare: bool).
 const store = require('../lib/store');
 const { ID_RE, readJson, send } = require('../lib/http');
 
@@ -12,7 +13,8 @@ module.exports = async (req, res) => {
     const u = await store.getUser(b.id);
     if (!u) return send(res, 404, { error: 'unknown' });
     await store.addRun(u.id, {
-      score: int(b.score, 100000), nightmare: !!b.nightmare,
+      score: int(b.score, 100000),
+      mode: ['normal', 'hard', 'nightmare'].includes(b.mode) ? b.mode : b.nightmare ? 'nightmare' : 'normal',
       cause: /^[a-z]{2,20}$/.test(b.cause || '') ? b.cause : null,
       seconds: int(b.seconds, 36000), feathers: int(b.feathers, 100000), passed: int(b.passed, 100000),
     });
