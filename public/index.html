@@ -41,17 +41,6 @@
       </div>
     </section>
 
-    <!-- FORCED NIGHTMARE REVEAL -->
-    <section id="fate" class="screen">
-      <div class="fate-inner">
-        <div class="fate-dice">🎲</div>
-        <h1 class="fate-title" data-text="NIGHTMARE">NIGHTMARE</h1>
-        <p>Het lot heeft beslist, <b class="who"></b>.<br>Gij speelt in <b>nightmare-modus</b>.<br>Voor altijd. 😈</p>
-        <p class="small">Bliksem, aliens, omvallende bomen… veel succes.</p>
-        <button id="fateBtn" class="btn evil">Bring it on</button>
-      </div>
-    </section>
-
     <!-- GAME -->
     <section id="game" class="screen">
       <canvas id="cv"></canvas>
@@ -63,6 +52,7 @@
         <div class="hud-right">
           <div class="pill score-pill"><span id="score">0</span></div>
           <button id="muteBtn" class="pill small icon-btn" aria-label="Geluid">🔊</button>
+          <button id="boardBtn" class="pill small icon-btn" aria-label="Scorebord">🏆</button>
         </div>
       </div>
       <div id="songNote" class="song-note hidden">♪</div>
@@ -82,6 +72,24 @@
           <p class="muted" id="overMeta"></p>
           <p id="overBest" class="best-line"></p>
           <button id="againBtn" class="btn primary wide">Nog eens!</button>
+          <button id="overBoardBtn" class="btn ghost wide">🏆 Scorebord</button>
+        </div>
+      </div>
+      <div id="board" class="sheet board hidden">
+        <div class="sheet-inner board-inner">
+          <div class="board-head">
+            <h2>🏆 Scorebord</h2>
+            <button id="boardClose" class="board-x" aria-label="Sluiten">✕</button>
+          </div>
+          <div class="tabs" role="tablist">
+            <button class="tab on" data-mode="all">Alle spellen</button>
+            <button class="tab" data-mode="nm">😈 Nightmare</button>
+          </div>
+          <div class="tabs sub" role="tablist">
+            <button class="tab on" data-view="best">Beste per speler</button>
+            <button class="tab" data-view="top">Top 10 ooit</button>
+          </div>
+          <ol id="boardList" class="board-list"></ol>
         </div>
       </div>
     </section>

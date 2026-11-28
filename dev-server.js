@@ -5,6 +5,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Load DATABASE_URL etc. from .env.local (created by `vercel env pull .env.local`).
+try { process.loadEnvFile(path.join(__dirname, '.env.local')); } catch {}
+
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const API_DIR = path.join(__dirname, 'api');

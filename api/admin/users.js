@@ -1,28 +1,24 @@
-// Admin API (header x-pin = ADMIN_PIN)
-//   GET    /api/admin/users              -> all users
-//   PATCH  /api/admin/users {id, nightmare: bool}
-//   DELETE /api/admin/users {id}
+// Admin API (header x-admin-password = the password set on the first visit to /admin)
+//   GET    /api/admin/users              -> all users with all their runs
+//   PATCH  /api/admin/users {id, nightmare: bool}   (toggle the "nightmare only" stamp)
+//   DELETE /api/admin/users {id}                    (removes the user and all their runs)
 const store = require('../../lib/store');
-const { ID_RE, readJson, send, adminOk } = require('../../lib/http');
+const { ID_RE, readJson, send, checkPassword } = require('../../lib/http');
+const { KEY } = require('./auth');
 
 module.exports = async (req, res) => {
-  if (!adminOk(req)) return send(res, 401, { error: 'pin' });
   try {
-    if (req.method === 'GET') {
-      const users = (await store.list()).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
-      return send(res, 200, { store: store.kind, users });
-    }
+    if (!checkPassword(req.headers['x-admin-password'], await store.getSetting(KEY))) return send(res, 401, { error: 'password' });
+    if (req.method === 'GET') return send(res, 200, { users: await store.listUsersWithRuns() });
     const b = await readJson(req);
     if (!ID_RE.test(b.id || '')) return send(res, 400, { error: 'bad_id' });
     if (req.method === 'PATCH') {
-      const u = await store.get(b.id);
-      if (!u) return send(res, 404, { error: 'unknown' });
-      if (typeof b.nightmare === 'boolean') u.nightmare = b.nightmare;
-      await store.put(u);
-      return send(res, 200, { user: u });
+      if (typeof b.nightmare !== 'boolean') return send(res, 400, { error: 'nightmare' });
+      const u = await store.setNightmare(b.id, b.nightmare);
+      return u ? send(res, 200, { user: u }) : send(res, 404, { error: 'unknown' });
     }
     if (req.method === 'DELETE') {
-      await store.del(b.id);
+      await store.deleteUser(b.id);
       return send(res, 200, { ok: true });
     }
     return send(res, 405, { error: 'method' });

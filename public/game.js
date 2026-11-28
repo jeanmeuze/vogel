@@ -419,7 +419,7 @@
     } else if (p.type === 'boa') {
       p.x -= v * dt;
       const near = p.x - b.x < H * 0.14 && p.x - b.x > -H * 0.08;
-      if (p.phase === 'idle' && near) { p.phase = 'strike'; p.target = clamp(b.y + H * 0.05, p.rest, gy - 10); }
+      if (p.phase === 'idle' && near) { p.phase = 'strike'; p.target = clamp(b.y + H * 0.05, p.rest, g.mode === 'nightmare' ? gy - 10 : H * 0.5); } // normal: snakes reach halfway at most
       if (p.phase === 'strike') { p.len += H * 2.3 * dt; if (p.len >= p.target) { p.len = p.target; p.phase = 'hold'; p.hold = 0.3; } }
       else if (p.phase === 'hold') { p.hold -= dt; if (p.hold <= 0) p.phase = 'back'; }
       else if (p.phase === 'back') { p.len = Math.max(p.rest, p.len - H * 0.8 * dt); }

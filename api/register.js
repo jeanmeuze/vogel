@@ -1,8 +1,8 @@
-// POST /api/register {id, name, restore?: {nightmare}}
-// First registration rolls the dice: NIGHTMARE_CHANCE (default 1/3) => forced nightmare forever.
-// `restore` lets a client re-create a record the server lost (memory store), keeping its fate.
+// POST /api/register {id, name}
+// A new player rolls the dice once: NIGHTMARE_CHANCE (default 1 in 4) gets the
+// "nightmare only" stamp. The player is not told; their game is simply always nightmare.
 const store = require('../lib/store');
-const { ID_RE, NIGHTMARE_CHANCE, readJson, send, cleanName, publicUser } = require('../lib/http');
+const { ID_RE, NIGHTMARE_CHANCE, readJson, send, cleanName, setIdCookie } = require('../lib/http');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'method' });
@@ -11,18 +11,10 @@ module.exports = async (req, res) => {
   const name = cleanName(b.name);
   if (!name) return send(res, 400, { error: 'name' });
   try {
-    let u = await store.get(b.id);
-    const now = Date.now();
-    if (!u) {
-      const restored = b.restore && typeof b.restore.nightmare === 'boolean';
-      u = { id: b.id, name, nightmare: restored ? b.restore.nightmare : Math.random() < NIGHTMARE_CHANCE,
-        createdAt: now, lastSeen: now, runs: 0, best: 0, bestNightmare: 0, restored: !!restored };
-    } else {
-      u.name = name;
-      u.lastSeen = now;
-    }
-    await store.put(u);
-    return send(res, 200, { user: publicUser(u) });
+    const existing = await store.getUser(b.id);
+    const u = await store.createUser(b.id, name, existing ? existing.nightmare : Math.random() < NIGHTMARE_CHANCE);
+    setIdCookie(req, res, u.id);
+    return send(res, 200, { user: { id: u.id, name: u.name, nightmare: u.nightmare, ...(await store.userBest(u.id)) } });
   } catch (e) {
     console.error(e);
     return send(res, 500, { error: 'store' });
