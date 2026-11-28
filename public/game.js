@@ -146,7 +146,7 @@
   }
 
   // ---------------------------------------------------------------- spawning
-  function spawnObstacle() {
+  function spawnObstacle(x = W + 10) {
     const p = P();
     const gap = Math.max(p.minGap, p.startGap - p.gapShrink * g.t - (curse('narrow') ? 0.035 : 0)) * H;
     const w = obsW();
@@ -155,7 +155,7 @@
     c = clamp(c * H, top + gap / 2, bot - gap / 2) / H;
     g.lastC = c;
     const o = {
-      x: W + 10, w, cy: c * H, gap, top: 0, bot: 0, kind: Math.random() < 0.25 ? 'nest' : 'vine',
+      x, w, cy: c * H, gap, top: 0, bot: 0, kind: Math.random() < 0.25 ? 'nest' : 'vine',
       phase: rand(0, TAU), move: curse('moving') ? rand(0.04, 0.08) * H : 0,
       angle: 0, av: 0, topple: null, L: 0, warnT: 0, drop: 0, dropV: 0, snap: null, breath: false,
       flag: g.flagsOn && Math.random() < 0.75 ? pick(FLAGS) : null, passed: false,
@@ -171,12 +171,26 @@
     g.fea.push({ x, y, color: pick(FEATHER_COLORS), ph: rand(0, TAU), wasp: g.waspT > 0, revealed: false, vx: 0, vy: 0 });
   }
 
+  // Snakes hang in the open space between two trees, somewhere in its middle half
+  // (25%..75%), never right against a tree. Trees and snakes scroll at the same speed,
+  // so the position is fixed at spawn: between the newest tree and the next one
+  // (which will appear one `spacing()` further), or one gap later if that spot is
+  // already on screen.
+  function boaX() {
+    const last = g.obs[g.obs.length - 1];
+    if (!last) return W + 30;
+    const sp = spacing();
+    for (let k = 0; ; k++) { // k-th gap after the newest tree
+      const from = last.x + k * sp + (k === 0 ? last.w : obsW()), to = last.x + (k + 1) * sp;
+      if (lerp(from, to, 0.25) >= W + 30) return lerp(from, to, rand(0.25, 0.75));
+    }
+  }
   const PRED_TYPES = ['harpy', 'harpy', 'boa', 'boa', 'monkey', 'monkey', 'toucan', 'toucan', 'jaguar'];
   function spawnPredator(type) {
     type = type || pick(PRED_TYPES);
     const s = H;
     if (type === 'harpy') g.preds.push({ type, phase: 'warn', t: 0.9, x: W + 40, y: rand(0.08, 0.25) * s, vx: 0, vy: 0, r: s * 0.035 });
-    else if (type === 'boa') g.preds.push({ type, x: W + 30, len: rand(0.12, 0.26) * s, rest: 0, phase: 'idle', hold: 0, r: s * 0.028 });
+    else if (type === 'boa') g.preds.push({ type, x: boaX(), len: rand(0.12, 0.26) * s, rest: 0, phase: 'idle', hold: 0, r: s * 0.028 });
     else if (type === 'monkey') g.preds.push({ type, x: W + 40, L: rand(0.26, 0.42) * s, amp: rand(0.6, 0.95), w: rand(1.8, 2.6), ph: rand(0, TAU), r: s * 0.038, bx: 0, by: 0 });
     else if (type === 'toucan') g.preds.push({ type, x: W + 40, y0: clamp(g.bird.y + rand(-0.15, 0.15) * s, s * 0.15, groundY() - s * 0.1), y: 0, ph: rand(0, TAU), extra: rand(0.25, 0.4) * s, r: s * 0.03 });
     else if (type === 'jaguar') g.preds.push({ type, x: W + 40, y: groundY() - s * 0.035, vy: 0, phase: 'lurk', r: s * 0.04 });
@@ -299,7 +313,11 @@
       else { if (b.y < R) { b.y = R; b.vy = 0; } if (b.y + hr > gy) return die('ground'); }
 
       // spawn
-      if (v > 0) { g.sinceObs += v * dt; if (g.sinceObs >= spacing()) { g.sinceObs = 0; spawnObstacle(); } }
+      // The next tree comes exactly spacing() after the newest one (also after being blown
+      // backwards), so snakes placed in the gap ahead (boaX) stay where they belong.
+      const lastObs = g.obs[g.obs.length - 1];
+      if (lastObs) { if (lastObs.x + spacing() <= W + 10) spawnObstacle(lastObs.x + spacing()); }
+      else if (v > 0) { g.sinceObs += v * dt; if (g.sinceObs >= spacing()) { g.sinceObs = 0; spawnObstacle(); } }
       const pf = P().predatorsFrom;
       if (g.t >= pf && g.t >= g.nextPred) { spawnPredator(); g.nextPred = g.t + ramp(P().predatorEvery, 90) * rand(0.75, 1.25); }
       if (g.mode === 'nightmare' && g.t >= g.nextEvent) { triggerEvent(); g.nextEvent = g.t + ramp(CFG.nightmare.eventEvery, CFG.nightmare.rampSeconds) * rand(0.7, 1.25); }
