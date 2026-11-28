@@ -159,6 +159,13 @@
     const d = boardState.data;
     if (!d) { list.innerHTML = '<li class="empty">Laden…</li>'; return; }
     if (d.error) { list.innerHTML = '<li class="empty">Scorebord niet bereikbaar.</li>'; return; }
+    $('#boardSub').classList.toggle('hidden', boardState.mode === 'causes');
+    if (boardState.mode === 'causes') { // top 10 causes of death, all games
+      list.innerHTML = (d.causes || []).map((c, i) => `
+        <li><span class="rk">${MEDALS[i] || i + 1}</span><span class="nm">${esc(causeLabel(c.cause))}</span><span class="sc">${c.deaths}<small> ×</small></span></li>`).join('')
+        || '<li class="empty">Nog niemand gestorven. Nog niet.</li>';
+      return;
+    }
     const key = (boardState.mode === 'nm' ? 'nm' : '') + (boardState.view === 'best' ? 'Best' : 'Top');
     const rows = d[key.charAt(0).toLowerCase() + key.slice(1)] || [];
     list.innerHTML = rows.map((r, i) => `
@@ -216,7 +223,7 @@
       $('#overBest').innerHTML = record ? '🏆 <b>Nieuw record!</b>' : `Record: <b>${Math.max(prev, r.score)}</b>`;
       over.classList.remove('hidden');
       renderToggle();
-      api('/api/score', { id, score: r.score, nightmare: r.mode === 'nightmare', seconds: r.seconds, feathers: r.feathers, passed: r.passed })
+      api('/api/score', { id, score: r.score, nightmare: r.mode === 'nightmare', seconds: r.seconds, feathers: r.feathers, passed: r.passed, cause: r.causeKey })
         .then((j) => { if (j.user) applyServerUser(j.user); })
         .catch(() => {});
     },

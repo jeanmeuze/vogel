@@ -13,6 +13,7 @@ module.exports = async (req, res) => {
     if (!u) return send(res, 404, { error: 'unknown' });
     await store.addRun(u.id, {
       score: int(b.score, 100000), nightmare: !!b.nightmare,
+      cause: /^[a-z]{2,20}$/.test(b.cause || '') ? b.cause : null,
       seconds: int(b.seconds, 36000), feathers: int(b.feathers, 100000), passed: int(b.passed, 100000),
     });
     return send(res, 200, { user: { id: u.id, name: u.name, nightmare: u.nightmare, ...(await store.userBest(u.id)) } });

@@ -256,7 +256,7 @@
     burst(g.bird.x, g.bird.y, '#ffffff', 14);
     if (navigator.vibrate) navigator.vibrate(80);
     OG.audio && OG.audio.sfx('die');
-    const res = { score: g.score, feathers: g.feathers, passed: g.passed, seconds: Math.round(g.t), mode: g.mode, cause: pick(DEATH[cause] || DEATH.tree) };
+    const res = { score: g.score, feathers: g.feathers, passed: g.passed, seconds: Math.round(g.t), mode: g.mode, causeKey: cause, cause: pick(DEATH[cause] || DEATH.tree) };
     setTimeout(() => hooks.onDeath && hooks.onDeath(res), 1100);
   }
 

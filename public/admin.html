@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex">
   <title>Admin · Wie ben ik?</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="/causes.js"></script>
   <style>
     body { overflow: auto; -webkit-user-select: auto; user-select: auto; background: linear-gradient(180deg, #a9e2cf, #fff3d6) fixed; }
     .wrap { max-width: 900px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 14px 40px; }
@@ -89,8 +90,8 @@
   }
   function runsTable(u) {
     if (!u.runs.length) return '<div class="none">Nog geen pogingen.</div>';
-    return '<table><tr><th>Modus</th><th>Score</th><th>Tijd</th><th>Pluimen</th><th>Bomen</th><th>Wanneer</th></tr>' +
-      u.runs.map((r) => `<tr><td>${r.nightmare ? '😈 nightmare' : 'normaal'}</td><td><b>${r.score}</b></td><td>${r.seconds} s</td><td>${r.feathers}</td><td>${r.passed}</td><td>${when(r.at)}</td></tr>`).join('') +
+    return '<table><tr><th>Modus</th><th>Score</th><th>Doodsoorzaak</th><th>Tijd</th><th>Pluimen</th><th>Bomen</th><th>Wanneer</th></tr>' +
+      u.runs.map((r) => `<tr><td>${r.nightmare ? '😈 nightmare' : 'normaal'}</td><td><b>${r.score}</b></td><td>${esc(causeLabel(r.cause))}</td><td>${r.seconds} s</td><td>${r.feathers}</td><td>${r.passed}</td><td>${when(r.at)}</td></tr>`).join('') +
       '</table>';
   }
   function render() {
